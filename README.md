@@ -1,1 +1,1 @@
-# Flutter UI - Plants App
+# SmartFarm Hub
