@@ -21,12 +21,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _farmSizeCtrl = TextEditingController();
   String? _selectedFarmingType;
 
-  static const _farmingTypes = ['Organic', 'Conventional', 'Mixed', 'Subsistence'];
-
   @override
   void initState() {
     super.initState();
-    _loadProfile();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadProfile());
   }
 
   void _loadProfile() {
@@ -79,12 +77,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title: const Text('My Profile'),
         actions: [
           TextButton(
-            onPressed: () =>
-                _isEditing ? _saveProfile() : setState(() => _isEditing = true),
-            child: Text(
-              _isEditing ? 'Save' : 'Edit',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-            ),
+            onPressed: () => _isEditing ? _saveProfile() : setState(() => _isEditing = true),
+            child: Text(_isEditing ? 'Save' : 'Edit',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -96,45 +91,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 key: _formKey,
                 child: Column(
                   children: [
-                    _ProfileAvatar(profile: profile),
+                    CircleAvatar(
+                      radius: 52,
+                      backgroundColor: AppColors.primary.withOpacity(0.2),
+                      child: Text(profile.name.isNotEmpty ? profile.name[0].toUpperCase() : '?',
+                          style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(profile.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    Text(profile.email, style: const TextStyle(color: AppColors.textGrey)),
                     const SizedBox(height: 24),
-                    _ProfileForm(
-                      isEditing: _isEditing,
-                      profile: profile,
-                      nameCtrl: _nameCtrl,
-                      ageCtrl: _ageCtrl,
-                      locationCtrl: _locationCtrl,
-                      farmSizeCtrl: _farmSizeCtrl,
-                      selectedFarmingType: _selectedFarmingType,
-                      farmingTypes: _farmingTypes,
-                      onFarmingTypeChanged: (v) =>
-                          setState(() => _selectedFarmingType = v),
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Farmer Information', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 16),
+                            if (_isEditing) ...[
+                              AppTextField(hintText: 'Full Name', labelText: 'Name', controller: _nameCtrl, prefixIcon: Icons.person_outline, validator: (v) => (v == null || v.isEmpty) ? 'Required' : null),
+                              const SizedBox(height: 12),
+                              AppTextField(hintText: 'Your age', labelText: 'Age', controller: _ageCtrl, prefixIcon: Icons.cake_outlined, keyboardType: TextInputType.number),
+                              const SizedBox(height: 12),
+                              AppTextField(hintText: 'City, State', labelText: 'Location', controller: _locationCtrl, prefixIcon: Icons.location_on_outlined),
+                              const SizedBox(height: 12),
+                              AppTextField(hintText: 'e.g. 2.5', labelText: 'Farm Size (Acres)', controller: _farmSizeCtrl, prefixIcon: Icons.landscape_outlined, keyboardType: TextInputType.number),
+                              const SizedBox(height: 12),
+                              DropdownButtonFormField<String>(
+                                decoration: InputDecoration(labelText: 'Farming Type', prefixIcon: const Icon(Icons.agriculture), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), filled: true, fillColor: Colors.white),
+                                value: _selectedFarmingType,
+                                items: ['Organic', 'Conventional', 'Mixed', 'Subsistence'].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+                                onChanged: (v) => setState(() => _selectedFarmingType = v),
+                              ),
+                            ] else ...[
+                              _InfoRow('Name', profile.name),
+                              _InfoRow('Age', profile.age?.toString() ?? 'Not set'),
+                              _InfoRow('Location', profile.location ?? 'Not set'),
+                              _InfoRow('Farm Size', profile.farmSize != null ? '${profile.farmSize} acres' : 'Not set'),
+                              _InfoRow('Farming Type', profile.farmingType ?? 'Not set'),
+                            ],
+                          ],
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 16),
-                    _ProfileMenu(
-                      onLogout: () async {
-                        final confirm = await showDialog<bool>(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            title: const Text('Sign Out'),
-                            content: const Text('Are you sure you want to sign out?'),
-                            actions: [
-                              TextButton(
-                                  onPressed: () => Navigator.pop(ctx, false),
-                                  child: const Text('Cancel')),
-                              TextButton(
-                                  onPressed: () => Navigator.pop(ctx, true),
-                                  child: const Text('Sign Out',
-                                      style: TextStyle(color: AppColors.error))),
-                            ],
-                          ),
-                        );
-                        if (confirm == true && context.mounted) {
-                          await context.read<ap.AuthProvider>().signOut();
-                        }
-                      },
+                    Card(
+                      child: Column(
+                        children: [
+                          ListTile(leading: const Icon(Icons.logout, color: AppColors.error), title: const Text('Sign Out', style: TextStyle(color: AppColors.error)), onTap: () async {
+                            final confirm = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(title: const Text('Sign Out'), content: const Text('Are you sure?'), actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')), TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Sign Out', style: TextStyle(color: AppColors.error)))]));
+                            if (confirm == true && context.mounted) await context.read<ap.AuthProvider>().signOut();
+                          }),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 80),
                   ],
                 ),
               ),
@@ -143,189 +154,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
-class _ProfileAvatar extends StatelessWidget {
-  final UserProfile profile;
-  const _ProfileAvatar({required this.profile});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        CircleAvatar(
-          radius: 52,
-          backgroundColor: AppColors.primary.withOpacity(0.2),
-          backgroundImage: profile.profileImageUrl != null
-              ? NetworkImage(profile.profileImageUrl!)
-              : null,
-          child: profile.profileImageUrl == null
-              ? Text(
-                  profile.name.isNotEmpty ? profile.name[0].toUpperCase() : '?',
-                  style: const TextStyle(
-                      fontSize: 40, fontWeight: FontWeight.bold, color: AppColors.primary),
-                )
-              : null,
-        ),
-        const SizedBox(height: 12),
-        Text(profile.name,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-        Text(profile.email, style: const TextStyle(color: AppColors.textGrey)),
-      ],
-    );
-  }
-}
-
-class _ProfileForm extends StatelessWidget {
-  final bool isEditing;
-  final UserProfile profile;
-  final TextEditingController nameCtrl, ageCtrl, locationCtrl, farmSizeCtrl;
-  final String? selectedFarmingType;
-  final List<String> farmingTypes;
-  final ValueChanged<String?> onFarmingTypeChanged;
-
-  const _ProfileForm({
-    required this.isEditing,
-    required this.profile,
-    required this.nameCtrl,
-    required this.ageCtrl,
-    required this.locationCtrl,
-    required this.farmSizeCtrl,
-    required this.selectedFarmingType,
-    required this.farmingTypes,
-    required this.onFarmingTypeChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Farmer Information',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            if (isEditing) ...[
-              AppTextField(
-                hintText: 'Full Name',
-                labelText: 'Name',
-                controller: nameCtrl,
-                prefixIcon: Icons.person_outline,
-                validator: (v) =>
-                    (v == null || v.isEmpty) ? 'Required' : null,
-              ),
-              const SizedBox(height: 12),
-              AppTextField(
-                hintText: 'Your age',
-                labelText: 'Age',
-                controller: ageCtrl,
-                prefixIcon: Icons.cake_outlined,
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 12),
-              AppTextField(
-                hintText: 'City, State',
-                labelText: 'Location',
-                controller: locationCtrl,
-                prefixIcon: Icons.location_on_outlined,
-              ),
-              const SizedBox(height: 12),
-              AppTextField(
-                hintText: 'e.g. 2.5',
-                labelText: 'Farm Size (Acres)',
-                controller: farmSizeCtrl,
-                prefixIcon: Icons.landscape_outlined,
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                decoration: InputDecoration(
-                  labelText: 'Farming Type',
-                  prefixIcon: const Icon(Icons.agriculture),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  filled: true,
-                  fillColor: Colors.white,
-                ),
-                value: selectedFarmingType,
-                items: farmingTypes
-                    .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                    .toList(),
-                onChanged: onFarmingTypeChanged,
-              ),
-            ] else ...[
-              _InfoRow('Name', profile.name, Icons.person_outline),
-              _InfoRow('Age', profile.age?.toString() ?? 'Not set', Icons.cake_outlined),
-              _InfoRow('Location', profile.location ?? 'Not set', Icons.location_on_outlined),
-              _InfoRow(
-                'Farm Size',
-                profile.farmSize != null ? '${profile.farmSize} acres' : 'Not set',
-                Icons.landscape_outlined,
-              ),
-              _InfoRow('Farming Type', profile.farmingType ?? 'Not set', Icons.agriculture),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _InfoRow extends StatelessWidget {
   final String label, value;
-  final IconData icon;
-  const _InfoRow(this.label, this.value, this.icon);
+  const _InfoRow(this.label, this.value);
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Icon(icon, color: AppColors.textGrey, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: const TextStyle(color: AppColors.textGrey, fontSize: 12)),
-                Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ProfileMenu extends StatelessWidget {
-  final VoidCallback onLogout;
-  const _ProfileMenu({required this.onLogout});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Column(
-        children: [
-          ListTile(
-            leading: const Icon(Icons.notifications_outlined),
-            title: const Text('Notifications'),
-            trailing: const Icon(Icons.chevron_right, color: AppColors.textGrey),
-            onTap: () {},
-          ),
-          const Divider(height: 1, indent: 56),
-          ListTile(
-            leading: const Icon(Icons.help_outline),
-            title: const Text('Help & FAQ'),
-            trailing: const Icon(Icons.chevron_right, color: AppColors.textGrey),
-            onTap: () {},
-          ),
-          const Divider(height: 1, indent: 56),
-          ListTile(
-            leading: const Icon(Icons.logout, color: AppColors.error),
-            title: const Text('Sign Out', style: TextStyle(color: AppColors.error)),
-            onTap: onLogout,
-          ),
+          Text(label, style: const TextStyle(color: AppColors.textGrey)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
         ],
       ),
     );

@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // User profiles - only owner can read/write
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Crops - authenticated users only, filtered by userId in app
+    match /crops/{cropId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+    
+    // Farm tasks - authenticated users only
+    match /tasks/{taskId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+    
+    // Disease detection history - authenticated users only
+    match /disease_history/{recordId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+    
+    // Knowledge articles - read-only for users, write for admins only
+    match /knowledge/{articleId} {
+      allow read: if true;
+      allow write: if false; // Only via Firebase Console or Cloud Functions
+    }
+  }
+}
